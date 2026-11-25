@@ -65,7 +65,27 @@ def review(run_id):
 @api.get("/api/runs/<run_id>/evidence")
 def evidence(run_id):
     run = serialize(store().get(run_id))
-    return jsonify(render(run))
+    artifact = render(run)
+    # 若批次已衍生凭证/更正，把凭证链并入证据，便于“对回更正前后电量”。
+    try:
+        voucher_row = store().find_voucher(run_id=run_id) if hasattr(store(), "find_voucher") else None
+        if voucher_row is not None:
+            from app.evidence.manifest import stable_digest
+            from app.vouchers.service import serialize_voucher
+            voucher = serialize_voucher(voucher_row, store())
+            artifact["voucher"] = voucher
+            artifact["voucher_id"] = voucher["id"]
+            artifact["corrections"] = voucher.get("corrections", [])
+            artifact["differences"] = voucher.get("differences", [])
+            artifact["voucher_download_url"] = voucher.get("download_url")
+            artifact["artifact_sha256"] = stable_digest(
+                {k: v for k, v in artifact.items() if k != "artifact_sha256"})
+    except DomainIssue:
+        raise
+    except Exception:
+        # 凭证扩展失败不影响既有签发证据
+        pass
+    return jsonify(artifact)
 
 
 @api.get("/api/examples/<profile>")

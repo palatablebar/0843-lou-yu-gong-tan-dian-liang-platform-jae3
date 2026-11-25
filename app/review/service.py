@@ -23,6 +23,14 @@ def approve(store, run_id, decision, comment, expected_revision):
         raise DomainIssue("RUN_NOT_FOUND", 404)
     if problem == "stale":
         raise DomainIssue("STALE_REVIEW", 409)
+    if decision == "APPROVED":
+        # 签发即生成当期凭证，使财务可立即围绕凭证接收更正/入账。
+        try:
+            from app.vouchers.service import VoucherService
+            VoucherService(store, runs_store=store).provision_for_run(run_id)
+        except Exception:
+            # 凭证衍生失败不影响签发主流程
+            pass
     return serialize(row)
 
 

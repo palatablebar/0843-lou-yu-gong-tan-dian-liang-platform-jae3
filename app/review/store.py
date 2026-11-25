@@ -4,18 +4,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.errors import DomainIssue
+from app.review.policy import approval_allowed
+from app.vouchers.store import VoucherStore, init_voucher_tables
 
-class Store:
-    def __init__(self, path):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.init()
 
-    def connect(self):
-        connection = sqlite3.connect(self.path, timeout=8)
-        connection.row_factory = sqlite3.Row
-        return connection
-
+class Store(VoucherStore):
     def init(self):
         with self.connect() as db:
             db.executescript('''
@@ -30,6 +24,7 @@ class Store:
               comment TEXT NOT NULL DEFAULT ''
             );
             ''')
+            init_voucher_tables(db)
 
     def find_by_request(self, request_key):
         with self.connect() as db:
